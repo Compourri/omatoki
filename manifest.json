@@ -17,12 +17,10 @@
   "homepage": "https://github.com/compourri/omatoki",
   "repository": "https://github.com/compourri/omatoki.git",
   "kinds": [
-    "bar-widget",
-    "service"
+    "bar-widget"
   ],
   "entryPoints": {
-    "barWidget": "BarWidget.qml",
-    "service": "Service.qml"
+    "barWidget": "BarWidget.qml"
   },
   "barWidget": {
     "displayName": "Omatoki",
