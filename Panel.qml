@@ -42,8 +42,13 @@ Panel {
   readonly property var weeks: Model.monthGrid(viewYear, viewMonth, weekStart, todayKey)
 
   // Hero clock follows the bar format ring — right-click cycling updates both.
-  // Extracts just the time token so "dddd HH:mm" and "HH:mm" both drive the hero.
-  readonly property string barFormatForHero: hostWidget && hostWidget.activeFormat ? String(hostWidget.activeFormat) : String(setting("format", "dddd HH:mm"))
+  // Use setting() directly (reactive) and mirror hostWidget.activeFormat when available.
+  readonly property string barFormatForHero: {
+    // Access both so QML tracks dependencies regardless of which is populated
+    var fromSetting = String(setting("format", "dddd HH:mm"))
+    var fromHost = hostWidget && hostWidget.activeFormat ? String(hostWidget.activeFormat) : ""
+    return fromHost !== "" ? fromHost : fromSetting
+  }
   readonly property string heroTimeFormat: {
     var f = barFormatForHero
     if (f.indexOf("h:mm") !== -1) return f.indexOf("AP") !== -1 ? "h:mm AP" : "h:mm"
