@@ -42,12 +42,15 @@ Panel {
   readonly property var weeks: Model.monthGrid(viewYear, viewMonth, weekStart, todayKey)
 
   // Hero clock follows the bar format ring — right-click cycling updates both.
-  // Use setting() directly (reactive) and mirror hostWidget.activeFormat when available.
+  // Force dependency on Panel's settings object and on hostWidget.activeFormat.
+  readonly property var _settingsDep: root.settings
   readonly property string barFormatForHero: {
-    // Access both so QML tracks dependencies regardless of which is populated
-    var fromSetting = String(setting("format", "dddd HH:mm"))
+    var _dep = _settingsDep // track settings object identity
     var fromHost = hostWidget && hostWidget.activeFormat ? String(hostWidget.activeFormat) : ""
-    return fromHost !== "" ? fromHost : fromSetting
+    var fromSetting = String(setting("format", "dddd HH:mm"))
+    // Prefer the live setting() value — host can be stale if injection races
+    if (fromSetting !== "dddd HH:mm" || fromHost === "") return fromSetting
+    return fromHost
   }
   readonly property string heroTimeFormat: {
     var f = barFormatForHero
@@ -59,10 +62,10 @@ Panel {
   }
   readonly property string heroDateFormat: {
     var f = barFormatForHero
-    // If bar is on the ISO / date-only preset, mirror it in the hero date line
     if (f === "d MMMM 'W'ww yyyy" || f === "yyyy-MM-dd HH:mm") return f.replace(/HH:mm|h:mm AP|h:mm/g, "").replace(/''yy/g, "yyyy").trim()
     return "MMMM d"
   }
+  // (removed debug console.log — was for format-sync verification)
 
   readonly property color contentForeground: bar ? bar.foreground : Color.foreground
   readonly property string contentFontFamily: bar ? bar.fontFamily : Style.font.family
