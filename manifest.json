@@ -9,9 +9,10 @@
   "keywords": ["clock", "calendar", "weather", "time", "omatoki", "dashboard"],
   "homepage": "https://github.com/compourri/omatoki",
   "repository": "https://github.com/compourri/omatoki.git",
-  "kinds": ["bar-widget"],
+  "kinds": ["bar-widget", "service"],
   "entryPoints": {
-    "barWidget": "BarWidget.qml"
+    "barWidget": "BarWidget.qml",
+    "service": "Service.qml"
   },
   "barWidget": {
     "displayName": "Omatoki",
