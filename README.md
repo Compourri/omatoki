@@ -1,15 +1,8 @@
 # Omatoki — おまとき
 
-**Clock + Calendar + Weather at a glance** for [Omarchy Quattro](https://omarchy.org).
+Clock, calendar, and weather in one Omarchy panel.
 
-One panel, everything today:
-
-* **Hero clock** — `15:10`, `Monday`, `September 7` (like your mock)
-* **Progress rails** — month `— 68% —`, year, and **life** (double-click year to set birth year / expectancy, like `omarchy.calendar-clock`)
-* **Month grid** — always 6 rows, week numbers, chevrons / wheel / `[/]` / arrow keys to step, `T` to today, `W` to toggle Monday/Sunday
-* **Weather** — `15°C` hero + `FOCHVILLE` + `FEELS / WIND / HUMID` + 3-day strip, with searchable location (click location → `geocoding-api.open-meteo.com`), `°C/°F` auto (locale + country), and `wttr.in` + `open-meteo` fallback — keeps all `omarchy.weather` functionality
-
-Keeps every `omarchy.clock` behaviour: bar format ring (right-click cycles `dddd HH:mm` → `h:mm AP` → …), vertical bar stack, middle-click → `omarchy-menu-timezone`, `shell.json` persistence.
+Omatoki shows the time, date, month grid, and forecast together. You get a large clock, year and life progress, a full month view, and current conditions with a 3-day forecast. It replaces the default clock and keeps everything that clock does.
 
 ![Omatoki preview](preview.png)
 
@@ -17,11 +10,10 @@ Keeps every `omarchy.clock` behaviour: bar format ring (right-click cycles `dddd
 
 ```sh
 omarchy plugin add https://github.com/compourri/omatoki.git --enable --yes
-# bar placement — replaces omarchy.clock in center by default
 omarchy bar move io.github.compourri.omatoki --section center
 ```
 
-Manual:
+Manual install:
 
 ```sh
 mkdir -p ~/.config/omarchy/plugins/io.github.compourri.omatoki
@@ -32,17 +24,17 @@ omarchy plugin enable io.github.compourri.omatoki
 
 ## Use
 
-* Click clock → open/close panel (also `omarchy-shell shell summon io.github.compourri.omatoki '{}'`)
-* Right-click clock → cycle bar format (persists to `shell.json`)
-* Middle-click clock → timezone picker
-* `W` / click `W` header → toggle week start Monday ↔ Sunday
-* `[/]` / scroll → month, `{/}` / `Shift+Scroll` → year, `T` → today
-* Double-click year rail → set `BORN` / `LIVE TO` (life bar hidden until birth year set; double-click life bar to clear)
-* Click location → search city (Enter to commit, Up/Down to pick, `×` to clear → IP auto-detect)
+* Click the clock to open or close the panel. You can also run `omarchy-shell shell summon io.github.compourri.omatoki '{}'`.
+* Right-click the clock to cycle the bar format. Omatoki writes your choice to `shell.json`.
+* Middle-click the clock to open the timezone picker.
+* Press `W` or click the `W` header to switch the week start between Monday and Sunday.
+* Press `[` and `]` or scroll to change month. Press `{` and `}` to change year. Press `T` to return to today.
+* Double-click the year bar to set your birth year and life expectancy. The life bar appears after you set a year. Double-click it to clear.
+* Click the location name to search for a city. Press Enter to save, Up and Down to pick a suggestion, and `×` to clear and return to automatic detection.
 
 ## Configure
 
-`shell.json` entry (via bar settings or hand-edit):
+Edit the entry in `~/.config/omarchy/shell.json`:
 
 ```json
 {
@@ -56,20 +48,21 @@ omarchy plugin enable io.github.compourri.omatoki
 }
 ```
 
-Weather location lives in `~/.local/state/omarchy/settings/weather.json` (shared with `omarchy.weather` via `omarchy-weather-location`).
+Omatoki stores the weather location in `~/.local/state/omarchy/settings/weather.json` and shares it with `omarchy.weather`. If you clear the location, it detects your city from your IP address and falls back to `wttr.in` and `open-meteo` for data.
 
 ## Remove
 
 ```sh
 omarchy plugin remove io.github.compourri.omatoki
-# built-in omarchy.clock comes back automatically
 ```
+
+The built-in clock returns automatically.
 
 ## Credits
 
-* Calendar / year / life math from `omarchy.clock/Model.js`
-* Weather fetch / geocoding / `open-meteo` + `wttr.in` from `omarchy.weather/Model.js`
-* Layout language from `omarchy.clock` + `omarchy.weather` panels
+* Calendar and life progress logic from `omarchy.clock`
+* Weather and geocoding logic from `omarchy.weather`
+* Panel layout based on the default clock and weather panels
 
 ## License
 
