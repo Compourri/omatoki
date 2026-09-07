@@ -41,6 +41,24 @@ Panel {
   readonly property var weekdays: Model.weekdayOrder(weekStart)
   readonly property var weeks: Model.monthGrid(viewYear, viewMonth, weekStart, todayKey)
 
+  // Hero clock follows the bar format ring — right-click cycling updates both.
+  // Extracts just the time token so "dddd HH:mm" and "HH:mm" both drive the hero.
+  readonly property string barFormatForHero: hostWidget && hostWidget.activeFormat ? String(hostWidget.activeFormat) : String(setting("format", "dddd HH:mm"))
+  readonly property string heroTimeFormat: {
+    var f = barFormatForHero
+    if (f.indexOf("h:mm") !== -1) return f.indexOf("AP") !== -1 ? "h:mm AP" : "h:mm"
+    if (f.indexOf("HH:mm") !== -1) return "HH:mm"
+    if (f.indexOf("HH") !== -1 && f.indexOf("mm") !== -1) return f.indexOf("AP") !== -1 ? "h:mm AP" : "HH:mm"
+    if (f.indexOf("AP") !== -1) return "h:mm AP"
+    return "HH:mm"
+  }
+  readonly property string heroDateFormat: {
+    var f = barFormatForHero
+    // If bar is on the ISO / date-only preset, mirror it in the hero date line
+    if (f === "d MMMM 'W'ww yyyy" || f === "yyyy-MM-dd HH:mm") return f.replace(/HH:mm|h:mm AP|h:mm/g, "").replace(/''yy/g, "yyyy").trim()
+    return "MMMM d"
+  }
+
   readonly property color contentForeground: bar ? bar.foreground : Color.foreground
   readonly property string contentFontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property int cellWidth: Style.space(52)
@@ -345,7 +363,7 @@ Panel {
 
             Text {
               anchors.horizontalCenter: parent.horizontalCenter
-              text: Qt.formatTime(clock.date, "HH:mm")
+              text: Qt.formatTime(clock.date, root.heroTimeFormat)
               color: root.contentForeground
               font.family: root.contentFontFamily
               font.pixelSize: 56
@@ -376,7 +394,12 @@ Panel {
                 }
                 Text {
                   id: heroDateText
-                  text: Qt.formatDate(root.today, "MMMM d")
+                  text: {
+                    var fmt = root.heroDateFormat
+                    // Expand ISO week token like BarWidget.formatted() does
+                    if (fmt.indexOf("ww") !== -1) fmt = fmt.replace(/ww/g, Model.isoWeekLiteral(root.today.getFullYear(), root.today.getMonth(), root.today.getDate()))
+                    return Qt.formatDate(root.today, fmt)
+                  }
                   color: heroMouse.containsMouse ? Style.hoverStateColor(root.contentForeground, Color.accent) : root.contentForeground
                   font.family: root.contentFontFamily
                   font.pixelSize: 24
