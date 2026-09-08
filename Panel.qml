@@ -196,7 +196,7 @@ Panel {
     }
     if (isNaN(lat) || isNaN(lon)) return
     var url = "https://api.open-meteo.com/v1/forecast?latitude=" + encodeURIComponent(String(lat)) + "&longitude=" + encodeURIComponent(String(lon)) + "&daily=weather_code,temperature_2m_max,temperature_2m_min&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day&forecast_days=4&timezone=auto"
-    dailyForecastProc.command = ["curl", "-fsS", "--max-time", "5", url]
+    dailyForecastProc.command = ["curl", "-fsS", "--max-time", "5", "--max-filesize", "2097152", url]
     dailyForecastProc.running = true
   }
   function startEditingLocation() {
@@ -222,7 +222,7 @@ Panel {
     locationSaveProc.running = true
   }
   function requestGeocode() { var q = locationField.text.trim(); if (q.length < 2) { locationSuggestions = []; return } geocodePendingQuery = q; if (!geocodeProc.running) startGeocode() }
-  function startGeocode() { geocodeActiveQuery = geocodePendingQuery; geocodeProc.command = ["curl", "-fsS", "--max-time", "5", "https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(geocodeActiveQuery) + "&count=5&language=en&format=json"]; geocodeProc.running = true }
+  function startGeocode() { geocodeActiveQuery = geocodePendingQuery; geocodeProc.command = ["curl", "-fsS", "--max-time", "5", "--max-filesize", "524288", "https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(geocodeActiveQuery) + "&count=5&language=en&format=json"]; geocodeProc.running = true }
   function buildForecastDays() { return Model.buildForecastDays(report, dailyForecastReport, Qt.formatDate(new Date(), "yyyy-MM-dd")) }
   function bareTempForDay(d, k) { return Model.bareTempForDay(d, k, useImperial) }
   function dayIcon(d) { return Model.dayIcon(d) }
@@ -245,14 +245,15 @@ Panel {
   // ----- Processes -----
   Process {
     id: forecastProc
-    command: ["curl", "-fsS", "--max-time", "10", "https://wttr.in/" + root.locationQuery + "?format=j1"]
+    command: ["curl", "-fsS", "--max-time", "10", "--max-filesize", "1048576", "https://wttr.in/" + root.locationQuery + "?format=j1"]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
         var raw = String(text || "").trim()
-        if (!raw) { root.scheduleForecastRetry(); return }
+        if (!raw || raw.length > 1048576) { root.scheduleForecastRetry(); return }
         try {
           var p = JSON.parse(raw)
+          if (!p || typeof p !== "object" || Array.isArray(p)) { root.scheduleForecastRetry(); return }
           root.report = p
           if (!root.hasConfiguredCoordinates) root.label = Model.provisionalCurrentIcon(p.current_condition && p.current_condition[0], root.label)
           root.forecastRetries = 0
@@ -270,9 +271,10 @@ Panel {
       waitForEnd: true
       onStreamFinished: {
         var raw = String(text || "").trim()
-        if (!raw) { root.scheduleDailyForecastRetry(); return }
+        if (!raw || raw.length > 2097152) { root.scheduleDailyForecastRetry(); return }
         try {
           var p = JSON.parse(raw)
+          if (!p || typeof p !== "object" || Array.isArray(p)) { root.scheduleDailyForecastRetry(); return }
           var cur = Model.openMeteoCurrentCondition(p)
           root.dailyForecastReport = p
           root.label = Model.currentIcon(cur, root.label)
@@ -287,7 +289,13 @@ Panel {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        root.locationSuggestions = root.editingLocation ? Model.parseGeocodingResults(text) : []
+        var raw = String(text || "").trim()
+        if (!raw || raw.length > 524288) { root.locationSuggestions = []; if (root.geocodePendingQuery !== root.geocodeActiveQuery) Qt.callLater(root.startGeocode); return }
+        try {
+          var p = JSON.parse(raw)
+          if (!p || typeof p !== "object") { root.locationSuggestions = []; if (root.geocodePendingQuery !== root.geocodeActiveQuery) Qt.callLater(root.startGeocode); return }
+        } catch (e) { root.locationSuggestions = []; if (root.geocodePendingQuery !== root.geocodeActiveQuery) Qt.callLater(root.startGeocode); return }
+        root.locationSuggestions = root.editingLocation ? Model.parseGeocodingResults(raw) : []
         root.suggestionIndex = 0
         if (root.geocodePendingQuery !== root.geocodeActiveQuery) Qt.callLater(root.startGeocode)
       }
@@ -309,8 +317,15 @@ Panel {
   }
   Process {
     id: locationProc
-    command: ["curl", "-fsS", "--max-time", "4", "https://wttr.in/?format=%l"]
-    stdout: StdioCollector { waitForEnd: true; onStreamFinished: { var r = String(text || "").trim(); if (!r) return; root.wttrLocation = r.split(",")[0] } }
+    command: ["curl", "-fsS", "--max-time", "4", "--max-filesize", "16384", "https://wttr.in/?format=%l"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var r = String(text || "").trim()
+        if (!r || r.length > 16384) return
+        root.wttrLocation = r.split(",")[0]
+      }
+    }
   }
   Timer { id: refreshTimer; interval: root.refreshMinutes * 60 * 1000; running: true; repeat: true; triggeredOnStart: true; onTriggered: root.refreshWeather() }
 
