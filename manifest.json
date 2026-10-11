@@ -5,14 +5,18 @@
   "version": "0.1.0",
   "author": "Compourri",
   "license": "MIT",
-  "description": "Clock + calendar + weather at a glance \u2014 hero time, month/year/life progress, month grid, and forecast in one Omarchy panel.",
+  "description": "Clock, calendar, weather, media player, and system monitors in one gorgeous dashboard panel.",
   "keywords": [
     "clock",
     "calendar",
     "weather",
+    "mpris",
+    "media",
+    "system",
+    "monitor",
+    "dashboard",
     "time",
-    "omatoki",
-    "dashboard"
+    "omatoki"
   ],
   "homepage": "https://github.com/Compourri/omatoki",
   "repository": "https://github.com/Compourri/omatoki.git",
@@ -62,6 +66,16 @@
         "key": "lifeExpectancy",
         "type": "integer",
         "label": "Life expectancy (default 90)"
+      },
+      {
+        "key": "unit",
+        "type": "string",
+        "label": "Units (metric/imperial, empty = auto)"
+      },
+      {
+        "key": "refreshMinutes",
+        "type": "integer",
+        "label": "Weather refresh interval in minutes (default 15)"
       }
     ]
   },

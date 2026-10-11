@@ -300,6 +300,76 @@ function iconForCode(code, night) {
 }
 function weatherResponseCompletesSave(hasCoords, src) { return hasCoords ? src === "open-meteo" : src === "wttr" }
 
+function parseMemInfo(raw) {
+  try {
+    var lines = String(raw || "").split("\n")
+    var total = 0, avail = 0
+    for (var i = 0; i < lines.length; i++) {
+      var parts = lines[i].split(":")
+      if (parts.length < 2) continue
+      var k = parts[0].trim()
+      var v = parseInt(parts[1].trim().split(" ")[0], 10)
+      if (k === "MemTotal") total = v
+      else if (k === "MemAvailable") avail = v
+    }
+    if (total <= 0) return 0
+    var used = total - avail
+    return Math.round((used / total) * 100)
+  } catch (e) { return 0 }
+}
+
+function parseDiskInfo(raw) {
+  try {
+    var lines = String(raw || "").split("\n")
+    for (var i = 1; i < lines.length; i++) {
+      var line = lines[i].replace(/\s+/g, " ").trim()
+      if (!line) continue
+      var parts = line.split(" ")
+      if (parts.length >= 5 && (parts[parts.length - 1] === "/" || parts[5] === "/")) {
+        var useField = parts[parts.length - 1] === "/" ? parts[parts.length - 2] : parts[4]
+        var pct = parseInt(useField.replace("%", ""), 10)
+        return isNaN(pct) ? 0 : pct
+      }
+    }
+    for (var j = 1; j < lines.length; j++) {
+      var tokens = lines[j].split(/\s+/)
+      for (var k = 0; k < tokens.length; k++) {
+        if (tokens[k].indexOf("%") !== -1) {
+          var p = parseInt(tokens[k].replace("%", ""), 10)
+          if (!isNaN(p)) return p
+        }
+      }
+    }
+    return 0
+  } catch (e) { return 0 }
+}
+
+function parseCpuUsage(prevIdle, prevTotal, curIdle, curTotal) {
+  var idleDelta = curIdle - prevIdle
+  var totalDelta = curTotal - prevTotal
+  if (totalDelta <= 0) return 0
+  var usage = Math.round(100 * (1 - idleDelta / totalDelta))
+  return Math.max(0, Math.min(100, usage))
+}
+
+function parseStatLine(line) {
+  try {
+    var parts = String(line || "").trim().split(/\s+/)
+    if (parts[0] !== "cpu") return null
+    var user = parseInt(parts[1], 10) || 0
+    var nice = parseInt(parts[2], 10) || 0
+    var system = parseInt(parts[3], 10) || 0
+    var idle = parseInt(parts[4], 10) || 0
+    var iowait = parseInt(parts[5], 10) || 0
+    var irq = parseInt(parts[6], 10) || 0
+    var softirq = parseInt(parts[7], 10) || 0
+    var steal = parseInt(parts[8], 10) || 0
+    var idleAll = idle + iowait
+    var totalAll = user + nice + system + idle + iowait + irq + softirq + steal
+    return { idle: idleAll, total: totalAll }
+  } catch (e) { return null }
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     dateKey, keyForDate, normalizedWeekStart, weekStartSettingName, toggledWeekStart, weekdayOrder,
@@ -310,6 +380,7 @@ if (typeof module !== "undefined") {
     parseLocationFile, wttrLocationQuery, parseGeocodingResults, locationCommit,
     isFutureForecastDate, roundedTemp, celsiusToFahrenheit, formatTemp, shouldUseImperial,
     dayName, openMeteoForecastDays, openMeteoCurrentCondition, currentIcon, provisionalCurrentIcon,
-    buildForecastDays, bareTempForDay, dayIcon, iconForOpenMeteoCode, iconForCode, wttrNextForecastDays, weatherResponseCompletesSave
+    buildForecastDays, bareTempForDay, dayIcon, iconForOpenMeteoCode, iconForCode, wttrNextForecastDays, weatherResponseCompletesSave,
+    parseMemInfo, parseDiskInfo, parseCpuUsage, parseStatLine
   }
 }

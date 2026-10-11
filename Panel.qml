@@ -1,13 +1,12 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Services.Mpris
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
 
-// Omatoki — one panel to rule them all: hero clock + year/life + calendar + weather.
-// Keeps every omarchy.clock interaction (week start, birthYear, month stepping)
-// and every omarchy.weather interaction (location search, units, refresh, forecast).
+// Omatoki — Unified Dashboard Panel (Time, Calendar, Weather, Media, System Monitors)
 Panel {
   id: root
   moduleName: "io.github.compourri.omatoki"
@@ -41,14 +40,11 @@ Panel {
   readonly property var weekdays: Model.weekdayOrder(weekStart)
   readonly property var weeks: Model.monthGrid(viewYear, viewMonth, weekStart, todayKey)
 
-  // Hero clock follows the bar format ring — right-click cycling updates both.
-  // Force dependency on Panel's settings object and on hostWidget.activeFormat.
   readonly property var _settingsDep: root.settings
   readonly property string barFormatForHero: {
-    var _dep = _settingsDep // track settings object identity
+    var _dep = _settingsDep
     var fromHost = hostWidget && hostWidget.activeFormat ? String(hostWidget.activeFormat) : ""
     var fromSetting = String(setting("format", "dddd HH:mm"))
-    // Prefer the live setting() value — host can be stale if injection races
     if (fromSetting !== "dddd HH:mm" || fromHost === "") return fromSetting
     return fromHost
   }
@@ -65,7 +61,6 @@ Panel {
     if (f === "d MMMM 'W'ww yyyy" || f === "yyyy-MM-dd HH:mm") return f.replace(/HH:mm|h:mm AP|h:mm/g, "").replace(/''yy/g, "yyyy").trim()
     return "MMMM d"
   }
-  // (removed debug console.log — was for format-sync verification)
 
   readonly property color contentForeground: bar ? bar.foreground : Color.foreground
   readonly property string contentFontFamily: bar ? bar.fontFamily : Style.font.family
@@ -140,10 +135,12 @@ Panel {
   }
   function toggle() { if (root.opened) root.close(); else root.open() }
   function switchPanel(d) { if (root.bar && typeof root.bar.switchPanelFrom === "function") return root.bar.switchPanelFrom(root.barIdentity, d); return false }
-  function setCenterHoverRevealSuppressed(v) { if (root.bar && "centerHoverRevealSuppressed" in root.bar) root.bar.centerHoverRevealSuppressed = v }
+  function setCenterHoverRevealSuppressed(v) {
+    if (root.bar && typeof root.bar.setCenterHoverRevealSuppressed === "function") root.bar.setCenterHoverRevealSuppressed(v)
+    else if (root.bar && "centerHoverRevealSuppressed" in root.bar) root.bar.centerHoverRevealSuppressed = v
+  }
   function refresh() {
     root.today = new Date()
-    // keep viewingCurrentMonth sticky across midnight
     var follow = root.viewingCurrentMonth
     if (follow) goToToday()
   }
@@ -377,9 +374,9 @@ Panel {
         Column {
           id: omatokiColumn
           width: Math.max(omatokiScroll.width, gridColumn.width + Style.space(32))
-          spacing: Style.space(10)
+          spacing: Style.space(12)
 
-          // ---- HERO CLOCK: 15:10 / Monday / September 7 ----
+          // ---- 1. HERO TIME ----
           Column {
             width: parent.width
             spacing: Style.space(2)
@@ -419,7 +416,6 @@ Panel {
                   id: heroDateText
                   text: {
                     var fmt = root.heroDateFormat
-                    // Expand ISO week token like BarWidget.formatted() does
                     if (fmt.indexOf("ww") !== -1) fmt = fmt.replace(/ww/g, Model.isoWeekLiteral(root.today.getFullYear(), root.today.getMonth(), root.today.getDate()))
                     return Qt.formatDate(root.today, fmt)
                   }
@@ -442,7 +438,7 @@ Panel {
             }
           }
 
-          // ---- Year progress (mock's "2026 — 68%" rail) ----
+          // ---- Year progress ----
           Item {
             width: parent.width
             height: yearBlock.y + yearBlock.height
@@ -476,7 +472,7 @@ Panel {
             }
           }
 
-          // ---- Life progress (memento mori) ----
+          // ---- Life progress ----
           Item {
             visible: root.birthYear > 0
             width: parent.width
@@ -501,7 +497,7 @@ Panel {
             }
           }
 
-          // ---- Calendar grid ----
+          // ---- 2. CALENDAR GRID ----
           Item {
             width: parent.width
             height: gridColumn.y + gridColumn.height
@@ -576,10 +572,9 @@ Panel {
             }
           }
 
-          // ---- Divider ----
           Rectangle { width: parent.width; height: Style.spacing.hairline; color: root.contentForeground; opacity: 0.12 }
 
-          // ---- Weather hero ----
+          // ---- 3. WEATHER ----
           Item {
             width: parent.width
             height: Math.max(weatherLeft.height, weatherRight.height)
@@ -687,6 +682,230 @@ Panel {
                       Text { text: root.bareTempForDay(modelData, "max"); color: root.contentForeground; font.family: root.contentFontFamily; font.pixelSize: Style.font.body }
                       Text { text: root.bareTempForDay(modelData, "min"); color: Qt.darker(root.contentForeground, 1.5); font.family: root.contentFontFamily; font.pixelSize: Style.font.body }
                     }
+                  }
+                }
+              }
+            }
+          }
+
+          Rectangle { width: parent.width; height: Style.spacing.hairline; color: root.contentForeground; opacity: 0.12 }
+
+          // ---- 4. MPRIS MEDIA PLAYER ----
+          Item {
+            id: mediaItemContainer
+            property var player: {
+              var vals = Mpris.players.values
+              for (var i = 0; i < vals.length; i++) {
+                if (vals[i].trackTitle && vals[i].trackTitle !== "") return vals[i]
+              }
+              return vals.length > 0 ? vals[0] : null
+            }
+            width: parent.width
+            height: player && player.trackTitle ? mediaCol.implicitHeight : 0
+            visible: player && player.trackTitle !== ""
+
+            Column {
+              id: mediaCol
+              width: parent.width
+              spacing: Style.space(8)
+
+              Row {
+                width: parent.width
+                spacing: Style.space(12)
+                
+                Rectangle {
+                  width: Style.space(40); height: Style.space(40); radius: Style.cornerRadius
+                  color: Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.08)
+                  Text {
+                    anchors.centerIn: parent
+                    text: mediaItemContainer.player && mediaItemContainer.player.playbackState === Mpris.Playing ? "󰐊" : "󰏤"
+                    color: root.contentForeground
+                    font.family: root.contentFontFamily
+                    font.pixelSize: 20
+                  }
+                }
+
+                Column {
+                  width: parent.width - Style.space(140)
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: Style.space(2)
+                  Text {
+                    width: parent.width
+                    text: mediaItemContainer.player ? (mediaItemContainer.player.trackTitle || "No media") : ""
+                    color: root.contentForeground
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.body
+                    font.bold: true
+                    elide: Text.ElideRight
+                  }
+                  Text {
+                    width: parent.width
+                    text: mediaItemContainer.player ? (mediaItemContainer.player.trackArtist || mediaItemContainer.player.identity || "") : ""
+                    color: Qt.darker(root.contentForeground, 1.4)
+                    font.family: root.contentFontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    elide: Text.ElideRight
+                  }
+                }
+
+                Row {
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: Style.space(8)
+
+                  PanelActionButton {
+                    iconText: "󰒮"
+                    tooltipText: "Previous track"
+                    foreground: root.contentForeground
+                    fontFamily: root.contentFontFamily
+                    onClicked: { var p = mediaItemContainer.player; if (p && p.canGoPrevious) p.previous() }
+                  }
+                  PanelActionButton {
+                    iconText: mediaItemContainer.player && mediaItemContainer.player.playbackState === Mpris.Playing ? "󰏤" : "󰐊"
+                    tooltipText: "Play / Pause"
+                    foreground: root.contentForeground
+                    fontFamily: root.contentFontFamily
+                    enabled: { var p = mediaItemContainer.player; return !!p && !!(p.canTogglePlaying || p.canPlay || p.canPause) }
+                    onClicked: { var p = mediaItemContainer.player; if (p && (p.canTogglePlaying || p.canPlay || p.canPause)) p.togglePlaying() }
+                  }
+                  PanelActionButton {
+                    iconText: "󰒭"
+                    tooltipText: "Next track"
+                    foreground: root.contentForeground
+                    fontFamily: root.contentFontFamily
+                    onClicked: { var p = mediaItemContainer.player; if (p && p.canGoNext) p.next() }
+                  }
+                }
+              }
+            }
+          }
+
+          Rectangle {
+            visible: mediaItemContainer.player && mediaItemContainer.player.trackTitle !== ""
+            width: parent.width; height: Style.spacing.hairline; color: root.contentForeground; opacity: 0.12
+          }
+
+          // ---- 5. SYSTEM MONITORS (CPU, RAM, Disk) ----
+          Item {
+            id: sysMonItem
+            width: parent.width
+            height: sysRow.height
+
+            property int cpuUsage: 0
+            property int ramUsage: 0
+            property int diskUsage: 0
+            property real prevIdle: 0
+            property real prevTotal: 0
+
+            Timer {
+              interval: 2000; running: root.opened; repeat: true; triggeredOnStart: true
+              onTriggered: {
+                cpuProc.running = true
+                memProc.running = true
+                diskProc.running = true
+              }
+            }
+
+            Process {
+              id: cpuProc
+              command: ["head", "-n1", "/proc/stat"]
+              stdout: StdioCollector {
+                waitForEnd: true
+                onStreamFinished: {
+                  var res = Model.parseStatLine(text)
+                  if (res) {
+                    if (sysMonItem.prevTotal > 0) {
+                      sysMonItem.cpuUsage = Model.parseCpuUsage(sysMonItem.prevIdle, sysMonItem.prevTotal, res.idle, res.total)
+                    }
+                    sysMonItem.prevIdle = res.idle
+                    sysMonItem.prevTotal = res.total
+                  }
+                }
+              }
+            }
+
+            Process {
+              id: memProc
+              command: ["cat", "/proc/meminfo"]
+              stdout: StdioCollector {
+                waitForEnd: true
+                onStreamFinished: {
+                  sysMonItem.ramUsage = Model.parseMemInfo(text)
+                }
+              }
+            }
+
+            Process {
+              id: diskProc
+              command: ["df", "-h", "/"]
+              stdout: StdioCollector {
+                waitForEnd: true
+                onStreamFinished: {
+                  sysMonItem.diskUsage = Model.parseDiskInfo(text)
+                }
+              }
+            }
+
+            Row {
+              id: sysRow
+              anchors.horizontalCenter: parent.horizontalCenter
+              spacing: Style.space(32)
+
+              // CPU Meter
+              Row {
+                spacing: Style.space(8)
+                Text { anchors.verticalCenter: parent.verticalCenter; text: "󰻠"; color: Qt.darker(root.contentForeground, 1.4); font.family: root.contentFontFamily; font.pixelSize: Style.font.body }
+                Column {
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: Style.space(2)
+                  Row {
+                    spacing: Style.space(16)
+                    Text { text: "CPU"; color: Qt.darker(root.contentForeground, 1.5); font.family: root.contentFontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+                    Text { text: sysMonItem.cpuUsage + "%"; color: root.contentForeground; font.family: root.contentFontFamily; font.pixelSize: Style.font.caption; font.bold: true }
+                  }
+                  Rectangle {
+                    width: Style.space(90); height: Style.space(4); radius: Style.cornerRadius > 0 ? height / 2 : 0
+                    color: Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.12)
+                    Rectangle { width: Math.round(parent.width * (sysMonItem.cpuUsage / 100)); height: parent.height; radius: parent.radius; color: Style.selectedStateColor(root.contentForeground, Color.accent) }
+                  }
+                }
+              }
+
+              // RAM Meter
+              Row {
+                spacing: Style.space(8)
+                Text { anchors.verticalCenter: parent.verticalCenter; text: "󰘚"; color: Qt.darker(root.contentForeground, 1.4); font.family: root.contentFontFamily; font.pixelSize: Style.font.body }
+                Column {
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: Style.space(2)
+                  Row {
+                    spacing: Style.space(16)
+                    Text { text: "RAM"; color: Qt.darker(root.contentForeground, 1.5); font.family: root.contentFontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+                    Text { text: sysMonItem.ramUsage + "%"; color: root.contentForeground; font.family: root.contentFontFamily; font.pixelSize: Style.font.caption; font.bold: true }
+                  }
+                  Rectangle {
+                    width: Style.space(90); height: Style.space(4); radius: Style.cornerRadius > 0 ? height / 2 : 0
+                    color: Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.12)
+                    Rectangle { width: Math.round(parent.width * (sysMonItem.ramUsage / 100)); height: parent.height; radius: parent.radius; color: Style.selectedStateColor(root.contentForeground, Color.accent) }
+                  }
+                }
+              }
+
+              // Disk Meter
+              Row {
+                spacing: Style.space(8)
+                Text { anchors.verticalCenter: parent.verticalCenter; text: "󰋊"; color: Qt.darker(root.contentForeground, 1.4); font.family: root.contentFontFamily; font.pixelSize: Style.font.body }
+                Column {
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: Style.space(2)
+                  Row {
+                    spacing: Style.space(16)
+                    Text { text: "DISK"; color: Qt.darker(root.contentForeground, 1.5); font.family: root.contentFontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+                    Text { text: sysMonItem.diskUsage + "%"; color: root.contentForeground; font.family: root.contentFontFamily; font.pixelSize: Style.font.caption; font.bold: true }
+                  }
+                  Rectangle {
+                    width: Style.space(90); height: Style.space(4); radius: Style.cornerRadius > 0 ? height / 2 : 0
+                    color: Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.12)
+                    Rectangle { width: Math.round(parent.width * (sysMonItem.diskUsage / 100)); height: parent.height; radius: parent.radius; color: Style.selectedStateColor(root.contentForeground, Color.accent) }
                   }
                 }
               }

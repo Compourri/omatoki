@@ -10,8 +10,10 @@ Omatoki shows the time, date, month grid, and forecast together. You get a large
 
 ```sh
 omarchy plugin add https://github.com/compourri/omatoki.git --enable --yes
-omarchy bar move io.github.compourri.omatoki --section center
+omarchy bar put io.github.compourri.omatoki --section center
 ```
+
+This swaps out the built-in clock (both are single-instance Time widgets).
 
 Manual install:
 
